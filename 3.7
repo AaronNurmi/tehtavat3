@@ -7,7 +7,7 @@ const app = express()
 // Otetaan käyttöön JSON-runkojen käsittely
 app.use(express.json())
 
-// 🔹 Otetaan käyttöön Morgan loggaus tiny-konfiguraatiolla
+// Otetaan käyttöön Morgan loggaus tiny-konfiguraatiolla
 app.use(morgan('tiny'))
 
 // Kovakoodattu taulukko puhelinluettelosta
