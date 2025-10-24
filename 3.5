@@ -1,0 +1,83 @@
+// Express käyttöön
+const express = require('express')
+const app = express()
+
+// Otetaan käyttöön JSON-runkojen käsittely
+app.use(express.json())
+
+// Kovakoodattu taulukko puhelinluettelosta
+let persons = [
+  { id: 1, name: 'Arto Hellas', number: '040-123456' },
+  { id: 2, name: 'Ada Lovelace', number: '39-44-5323523' },
+  { id: 3, name: 'Dan Abramov', number: '12-43-234345' },
+  { id: 4, name: 'Mary Poppendieck', number: '39-23-6423122' },
+]
+
+// palautetaan kaikki henkilöt
+app.get('/api/persons', (request, response) => {
+  response.json(persons)
+})
+
+// palautetaan tietoa luettelosta
+app.get('/info', (request, response) => {
+  const count = persons.length
+  const date = new Date()
+  const info = `
+    <p>Phonebook has info for ${count} people</p>
+    <p>${date}</p>
+  `
+  response.send(info)
+})
+
+// yksittäisen henkilön haku
+app.get('/api/persons/:id', (request, response) => {
+  const id = Number(request.params.id)
+  const person = persons.find(p => p.id === id)
+
+  if (person) {
+    response.json(person)
+  } else {
+    response.status(404).end()
+  }
+})
+
+// henkilön poistaminen
+app.delete('/api/persons/:id', (request, response) => {
+  const id = Number(request.params.id)
+  persons = persons.filter(person => person.id !== id)
+  response.status(204).end()
+})
+
+// uuden henkilön lisääminen
+app.post('/api/persons', (request, response) => {
+  const body = request.body
+
+  // Tarkistetaan, että nimi ja numero on annettu
+  if (!body.name || !body.number) {
+    return response.status(400).json({
+      error: 'name or number missing',
+    })
+  }
+
+  // Luodaan uusi id
+  const newId = Math.floor(Math.random() * 1000000)
+
+  // Luodaan uusi henkilö-olio
+  const newPerson = {
+    id: newId,
+    name: body.name,
+    number: body.number,
+  }
+
+  // Lisätään henkilö taulukkoon
+  persons = persons.concat(newPerson)
+
+  // Palautetaan lisätty henkilö vastauksena
+  response.json(newPerson)
+})
+
+// Portti
+const PORT = 3001
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
+})
