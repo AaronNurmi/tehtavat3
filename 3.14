@@ -1,0 +1,101 @@
+// Express ja morgan käyttöön
+import express from 'express'
+import mongoose from 'mongoose'
+import morgan from 'morgan'
+import cors from 'cors'
+import dotenv from 'dotenv'
+import Person from './models/person.js'
+
+dotenv.config()
+
+const app = express()
+
+app.use(cors())
+
+// otetaan käyttöön JSON-runkojen käsittely
+app.use(express.json())
+
+app.use(express.static('build'))
+
+// Morgan-token POST-bodyn näyttämiseen
+morgan.token('body', (req) => {
+  return req.method === 'POST' ? JSON.stringify(req.body) : ''
+})
+
+// Morganilla loggaus
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'))
+
+// MongoDB-yhteys
+mongoose.connect(process.env.DB_URI)
+  .then(() => {
+    console.log('Connected to MongoDB')
+  })
+  .catch(err => console.error(err))
+
+// kaikki henkilöt
+app.get('/api/persons', (req, res) => {
+  Person.find({}).then(persons => {
+    res.json(persons)
+  })
+})
+
+// info pyyntöhetkestä ja henkilöiden määrä
+app.get('/info', (req, res) => {
+  Person.countDocuments({}).then(count => {
+    const date = new Date()
+    res.send(`<p>Phonebook has info for ${count} people</p><p>${date}</p>`)
+  })
+})
+
+// yksittäisen henkilön haku
+app.get('/api/persons/:id', (req, res, next) => {
+  Person.findById(req.params.id)
+    .then(person => {
+      if (person) res.json(person)
+      else res.status(404).end()
+    })
+    .catch(err => next(err))
+})
+
+// henkilön poistaminen
+app.delete('/api/persons/:id', (req, res, next) => {
+  Person.findByIdAndRemove(req.params.id)
+    .then(() => res.status(204).end())
+    .catch(err => next(err))
+})
+
+// uuden henkilön lisääminen
+app.post('/api/persons', (req, res, next) => {
+  const body = req.body
+
+  // jos nimi tai numero puuttuu
+  if (!body.name || !body.number) {
+    return res.status(400).json({ error: 'name or number missing' })
+  }
+
+  const person = new Person({
+    name: body.name,
+    number: body.number
+  })
+
+  person.save()
+    .then(savedPerson => res.status(201).json(savedPerson))
+    .catch(err => next(err))
+})
+
+// Virheiden käsittely
+app.use((err, req, res, next) => {
+  console.error(err.message)
+  if (err.name === 'CastError') {
+    return res.status(400).send({ error: 'malformatted id' })
+  } else if (err.name === 'ValidationError') {
+    return res.status(400).json({ error: err.message })
+  }
+  next(err)
+})
+
+// Portti
+const PORT = process.env.PORT || 3001
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`)
+})
