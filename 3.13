@@ -1,0 +1,84 @@
+backend index.js
+
+import express from 'express'
+import morgan from 'morgan'
+import cors from 'cors'
+import mongoose from 'mongoose'
+import Person from './models/person.js'
+
+const app = express()
+app.use(cors())
+app.use(express.json())
+app.use(express.static('build'))
+
+// Morgan-token POST-bodyn näyttämiseen
+morgan.token('body', (req) => req.method === 'POST' ? JSON.stringify(req.body) : '')
+app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'))
+
+// URL tietokantaan
+const url = `mongodb+srv://nurmiaaron:${process.env.DB_PASSWORD}@cluster0.jklmn.mongodb.net/phonebookApp?retryWrites=true&w=majority`
+
+mongoose.connect(url)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(error => console.error('Error connecting to MongoDB:', error))
+
+// kaikki henkilöt
+app.get('/api/persons', (req, res, next) => {
+  Person.find({})
+    .then(persons => res.json(persons))
+    .catch(error => next(error))
+})
+
+// info pyyntöhetkestä ja henkilöiden määrä
+app.get('/info', (req, res, next) => {
+  Person.countDocuments({})
+    .then(count => {
+      const date = new Date()
+      res.send(`<p>Phonebook has info for ${count} people</p><p>${date}</p>`)
+    })
+    .catch(error => next(error))
+})
+
+// yksittäisen henkilön haku
+app.get('/api/persons/:id', (req, res, next) => {
+  Person.findById(req.params.id)
+    .then(person => {
+      if (person) res.json(person)
+      else res.status(404).end()
+    })
+    .catch(error => next(error))
+})
+
+// henkilön poistaminen
+app.delete('/api/persons/:id', (req, res, next) => {
+  Person.findByIdAndRemove(req.params.id)
+    .then(() => res.status(204).end())
+    .catch(error => next(error))
+})
+
+// uuden henkilön lisääminen
+app.post('/api/persons', (req, res, next) => {
+  const { name, number } = req.body
+
+  if (!name || !number) {
+    return res.status(400).json({ error: 'name or number missing' })
+  }
+
+  const person = new Person({ name, number })
+
+  person.save()
+    .then(savedPerson => res.status(201).json(savedPerson))
+    .catch(error => next(error))
+})
+
+// Virheenkäsittely middleware
+app.use((error, req, res, next) => {
+  console.error(error.message)
+  if (error.name === 'CastError') return res.status(400).send({ error: 'malformatted id' })
+  if (error.name === 'ValidationError') return res.status(400).json({ error: error.message })
+  next(error)
+})
+
+// Portti
+const PORT = process.env.PORT || 3000
+app.listen(PORT, '0.0.0.0', () => console.log(`Server running on port ${PORT}`))
