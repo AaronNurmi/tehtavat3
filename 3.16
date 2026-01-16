@@ -1,0 +1,141 @@
+import express from 'express'
+import mongoose from 'mongoose'
+import morgan from 'morgan'
+import cors from 'cors'
+import dotenv from 'dotenv'
+import Person from './models/person.js'
+
+dotenv.config()
+
+const app = express()
+
+/* ========= PERUS MIDDLEWARET ========= */
+
+app.use(cors())
+app.use(express.json())
+app.use(express.static('build'))
+
+/* ========= MORGAN ========= */
+
+// Token POST-rungon näyttämiseen
+morgan.token('body', req =>
+  req.method === 'POST' ? JSON.stringify(req.body) : ''
+)
+
+app.use(
+  morgan(':method :url :status :res[content-length] - :response-time ms :body')
+)
+
+/* ========= MONGODB ========= */
+
+mongoose
+  .connect(process.env.DB_URI)
+  .then(() => {
+    console.log('Connected to MongoDB')
+  })
+  .catch(error => {
+    console.error('error connecting to MongoDB:', error.message)
+  })
+
+/* ========= ROUTET ========= */
+
+// Kaikki henkilöt
+app.get('/api/persons', (req, res, next) => {
+  Person.find({})
+    .then(persons => res.json(persons))
+    .catch(err => next(err))
+})
+
+// Info
+app.get('/info', (req, res, next) => {
+  Person.countDocuments({})
+    .then(count => {
+      res.send(`
+        <p>Phonebook has info for ${count} people</p>
+        <p>${new Date()}</p>
+      `)
+    })
+    .catch(err => next(err))
+})
+
+// Yhden henkilön haku
+app.get('/api/persons/:id', (req, res, next) => {
+  Person.findById(req.params.id)
+    .then(person => {
+      if (!person) {
+        return res.status(404).end()
+      }
+      res.json(person)
+    })
+    .catch(err => next(err))
+})
+
+// Henkilön poisto
+app.delete('/api/persons/:id', (req, res, next) => {
+  Person.findByIdAndRemove(req.params.id)
+    .then(() => res.status(204).end())
+    .catch(err => next(err))
+})
+
+// Uuden henkilön lisäys
+app.post('/api/persons', (req, res, next) => {
+  const body = req.body
+
+  const person = new Person({
+    name: body.name,
+    number: body.number
+  })
+
+  person
+    .save()
+    .then(savedPerson => res.status(201).json(savedPerson))
+    .catch(err => next(err))
+})
+
+// Numeron päivitys
+app.put('/api/persons/:id', (req, res, next) => {
+  const { number } = req.body
+
+  Person.findByIdAndUpdate(
+    req.params.id,
+    { number },
+    {
+      new: true,
+      runValidators: true,
+      context: 'query'
+    }
+  )
+    .then(updatedPerson => res.json(updatedPerson))
+    .catch(err => next(err))
+})
+
+
+// Tuntematon endpoint
+const unknownEndpoint = (req, res) => {
+  res.status(404).send({ error: 'unknown endpoint' })
+}
+
+// Virheidenkäsittely
+const errorHandler = (error, req, res, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return res.status(400).json({ error: 'malformatted id' })
+  }
+
+  if (error.name === 'ValidationError') {
+    return res.status(400).json({ error: error.message })
+  }
+
+  next(error)
+}
+
+app.use(unknownEndpoint)
+app.use(errorHandler)
+
+// PORTTI
+
+const PORT = process.env.PORT || 3001
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
+})
