@@ -1,0 +1,119 @@
+import express from 'express'
+import mongoose from 'mongoose'
+import morgan from 'morgan'
+import cors from 'cors'
+import dotenv from 'dotenv'
+import Person from './models/person.js'
+
+dotenv.config()
+
+const app = express()
+
+// Middlewaret
+
+app.use(cors())
+app.use(express.json())
+app.use(express.static('build'))
+
+morgan.token('body', req =>
+  req.method === 'POST' || req.method === 'PUT'
+    ? JSON.stringify(req.body)
+    : ''
+)
+
+app.use(
+  morgan(':method :url :status :res[content-length] - :response-time ms :body')
+)
+
+//Mongoose
+
+mongoose
+  .connect(process.env.DB_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(error => console.error(error.message))
+
+/* ===== ROUTET ===== */
+
+// Kaikki henkilöt
+app.get('/api/persons', (req, res, next) => {
+  Person.find({})
+    .then(persons => res.json(persons))
+    .catch(err => next(err))
+})
+
+// Yksi henkilö
+app.get('/api/persons/:id', (req, res, next) => {
+  Person.findById(req.params.id)
+    .then(person => {
+      if (!person) return res.status(404).end()
+      res.json(person)
+    })
+    .catch(err => next(err))
+})
+
+// Uusi henkilö
+app.post('/api/persons', (req, res, next) => {
+  const person = new Person(req.body)
+
+  person
+    .save()
+    .then(saved => res.status(201).json(saved))
+    .catch(err => next(err))
+})
+
+// numeron päivitys
+app.put('/api/persons/:id', (req, res, next) => {
+  const { number } = req.body
+
+  Person.findByIdAndUpdate(
+    req.params.id,
+    { number },
+    {
+      new: true,          // palauttaa päivitetyn dokumentin
+      runValidators: true, // ajaa scheman validoinnit
+      context: 'query'
+    }
+  )
+    .then(updatedPerson => {
+      if (!updatedPerson) return res.status(404).end()
+      res.json(updatedPerson)
+    })
+    .catch(err => next(err))
+})
+
+// poisto
+app.delete('/api/persons/:id', (req, res, next) => {
+  Person.findByIdAndRemove(req.params.id)
+    .then(() => res.status(204).end())
+    .catch(err => next(err))
+})
+
+// Virheiden käsittely
+
+const unknownEndpoint = (req, res) => {
+  res.status(404).send({ error: 'unknown endpoint' })
+}
+
+const errorHandler = (error, req, res, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return res.status(400).json({ error: 'malformatted id' })
+  }
+
+  if (error.name === 'ValidationError') {
+    return res.status(400).json({ error: error.message })
+  }
+
+  next(error)
+}
+
+app.use(unknownEndpoint)
+app.use(errorHandler)
+
+// Portti
+
+const PORT = process.env.PORT || 3001
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`)
+})
