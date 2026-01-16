@@ -195,21 +195,21 @@ const App = () => {
   const [newNumber, setNewNumber] = useState('')      // Lomakkeen numero
   const [notification, setNotification] = useState(null) // Virhe/success
 
-  // Hae henkilöt tietokannasta komponentin alussa
+  // Haetaan henkilöt tietokannasta komponentin alussa
   useEffect(() => {
     personService.getAll().then((initialPersons) => {
       setPersons(initialPersons)
     })
   }, [])
 
-  // Lisää tai päivitä henkilö
+  // Lisätään tai päivitetään henkilö
   const addPerson = (event) => {
     event.preventDefault()
     const existingPerson = persons.find((p) => p.name === newName)
 
     if (existingPerson) {
       // Jos henkilö on jo olemassa -> päivitä numero
-      if (window.confirm(`${newName} is already added. Replace the number?`)) {
+      if (window.confirm(`${newName} has already been added. Replace the number?`)) {
         const updatedPerson = { ...existingPerson, number: newNumber }
         personService
           .update(existingPerson.id, updatedPerson)
@@ -228,7 +228,7 @@ const App = () => {
           })
       }
     } else {
-      // Lisää uusi henkilö
+      // Lisätään uusi henkilö
       const personObject = { name: newName, number: newNumber }
       personService
         .create(personObject)
