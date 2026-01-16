@@ -9,13 +9,13 @@ dotenv.config()
 
 const app = express()
 
-/* ========= PERUS MIDDLEWARET ========= */
+// Perus middlewaret
 
 app.use(cors())
 app.use(express.json())
 app.use(express.static('build'))
 
-/* ========= MORGAN ========= */
+// Morgan
 
 // Token POST-rungon näyttämiseen
 morgan.token('body', req =>
@@ -26,7 +26,7 @@ app.use(
   morgan(':method :url :status :res[content-length] - :response-time ms :body')
 )
 
-/* ========= MONGODB ========= */
+//Mongoose
 
 mongoose
   .connect(process.env.DB_URI)
